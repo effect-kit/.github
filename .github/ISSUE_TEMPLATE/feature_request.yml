@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose an integration, capability, or API improvement.
+body:
+  - type: input
+    id: package
+    attributes:
+      label: Package or integration
+      placeholder: The existing package or proposed integration
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What are you trying to build?
+      description: Describe the application use case and what is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: A small usage example is helpful. An implementation is not required.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and tradeoffs
+      description: Describe existing APIs, workarounds, or provider differences to consider.

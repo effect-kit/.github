@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem in an EffectKit package.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open this issue in the repository that owns the affected package.
+        Remove credentials, private data, and live authentication links from examples.
+        Follow the repository's security reporting instructions for vulnerabilities.
+  - type: input
+    id: package
+    attributes:
+      label: Package and version
+      placeholder: "@effect-kit/redis, version or commit"
+    validations:
+      required: true
+  - type: input
+    id: effect
+    attributes:
+      label: Effect version
+      placeholder: The version installed in your application
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Runtime and environment
+      placeholder: "Node or Bun version, OS, and provider/server version when relevant"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide a small code example or public reproduction with the steps to run it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include relevant error output with sensitive values removed.
+    validations:
+      required: true

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Effect documentation
+    url: https://effect.website/docs
+    about: Learn Effect's core APIs and patterns.
