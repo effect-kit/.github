@@ -73,8 +73,8 @@ jobs:
 ```
 
 The CI template includes PRs, default-branch pushes, merge queues, and manual dispatch.
-CI never publishes. Keep repository-specific compatibility and service tests in separate
-jobs using the setup action. Choose required status checks after inspecting the migrated
+CI never publishes. Keep long artifact, compatibility, fuzzing, and service tests in manually
+dispatched workflows using the setup action. Choose required status checks after inspecting the migrated
 job names. GitHub-token-created version PRs do not automatically trigger ordinary CI;
 the manual CI entry point can check their branch. Release checks the merged commit with
 the repository's `release:prepare` and packed-archive verification commands.
@@ -84,7 +84,8 @@ the repository's `release:prepare` and packed-archive verification commands.
 `release.yml` requires `workflow_dispatch` from the caller's default branch. It serializes
 releases per repository without cancelling publication. Do not reuse its concurrency group
 in the caller. Inputs are `bun` (false, verification only), `timeout-minutes` (30, verification),
-and `report-paths` (empty, additional newline-separated evidence paths).
+`report-paths` (empty, additional newline-separated evidence paths), and `dry-run` (false).
+The supplied caller defaults `dry-run` to true. Uncheck it to create the version PR or publish.
 
 The workflow uses Changesets v2 actions with Changesets CLI v3:
 
@@ -98,6 +99,13 @@ The workflow uses Changesets v2 actions with Changesets CLI v3:
 Each package defines `release:prepare` to choose its release checks and build steps.
 It may reuse `ci:check` or run a different set. `release:check --pack-dir <directory>`
 always runs after packing to verify the exact archives that will be published.
+Keep both commands fast: full consumer/compiler matrices, repeated builds, fuzzing, and live
+tests belong in separate manually dispatched workflows.
+
+Verification-only runs create temporary patch Changesets for public workspace packages and
+exercise `release:version`, preparation, packing, and archive checks. These versions exist
+only in the runner checkout. The run creates no PRs, tags, GitHub releases, or npm versions.
+Its archives are verification candidates, not published artifacts for registry smoke checks.
 
 The caller authorizes `contents: write`, `pull-requests: write`, and `id-token: write` on
 the calling job. The shared workflow scopes those permissions to the jobs that need them:

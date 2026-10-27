@@ -3,6 +3,10 @@ name: Package release
 on:
   workflow_call:
     inputs:
+      dry-run:
+        description: Verify versioning and packed candidates without creating PRs or publishing
+        type: boolean
+        default: false
       bun:
         description: Install Bun while checking and packing the release
         type: boolean
@@ -66,7 +70,7 @@ jobs:
 
   version:
     needs: plan
-    if: needs.plan.outputs.mode == 'version'
+    if: "!inputs.dry-run && needs.plan.outputs.mode == 'version'"
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -93,7 +97,7 @@ jobs:
 
   prepare:
     needs: plan
-    if: needs.plan.outputs.mode == 'publish'
+    if: inputs.dry-run || needs.plan.outputs.mode == 'publish'
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout-minutes }}
     outputs:
@@ -109,13 +113,28 @@ jobs:
         with:
           bun: ${{ inputs.bun }}
 
+      - name: Prepare temporary versions for verification only
+        if: inputs.dry-run
+        run: |
+          pnpm list --recursive --depth -1 --json > "$RUNNER_TEMP/release-packages.json"
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const packages = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/release-packages.json`, 'utf8'));
+          const releases = packages.filter((pkg) => !pkg.private);
+          if (releases.length === 0) throw new Error('No publishable workspace packages found.');
+          const changes = releases.map((pkg) => `${JSON.stringify(pkg.name)}: patch`).join('\n');
+          writeFileSync(`.changeset/automation-dry-run-${process.env.GITHUB_RUN_ID}.md`,
+            `---\n${changes}\n---\n\nVerify release automation without publishing.\n`);
+          JS
+          pnpm release:version
+
       - name: Run package-specific release preparation
         run: pnpm release:prepare
 
       - id: pack
         uses: changesets/action/pack@v2
         with:
-          publish-plan-artifact-id: ${{ needs.plan.outputs.plan }}
+          publish-plan-artifact-id: ${{ !inputs.dry-run && needs.plan.outputs.plan || '' }}
 
       - uses: actions/download-artifact@v8
         with:
@@ -157,7 +176,7 @@ jobs:
 
   publish:
     needs: [plan, prepare]
-    if: needs.plan.outputs.mode == 'publish'
+    if: "!inputs.dry-run && needs.plan.outputs.mode == 'publish'"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

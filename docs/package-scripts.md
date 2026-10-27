@@ -16,7 +16,7 @@ implementation; shared YAML does not embed package paths or accept arbitrary she
 | `build`           | Build all workspace packages.                                                 |
 | `test:artifacts`  | Check package contents, exports, declarations, and isolated consumers.        |
 | `check`           | Run formatting, lint, types, tests, and build without changing tracked files. |
-| `ci:check`        | Run the complete offline PR gate, including artifact checks.                  |
+| `ci:check`        | Run fast formatting, lint, types, offline tests, and build for PRs.            |
 | `changeset`       | Record a release note and intended version bump.                              |
 | `release:version` | Update versions, changelogs, lockfile, and formatting.                        |
 | `release:prepare` | Run release-specific source checks and build the packages before packing.    |
@@ -29,12 +29,13 @@ A typical composition is:
 ```json
 {
   "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-  "ci:check": "pnpm check && pnpm test:artifacts",
+  "ci:check": "pnpm check",
   "release:prepare": "pnpm check"
 }
 ```
 
-Include other release-critical offline suites in `ci:check` when needed. `typecheck` must
+Keep repeated artifact builds, full consumer/compiler matrices, fuzzing, and live suites
+in manually dispatched workflows. `typecheck` must
 include test types, even if it delegates to an internal `typecheck:test` script.
 Local controlled fixtures are allowed in offline tests; Docker, live network services,
 credentials, and publication belong outside this gate. Installation may need registry access.
@@ -78,13 +79,13 @@ Add `dev`, `test:watch`, `test:unit`, `test:integration`, `test:compat`, `test:l
 
 ## Migrating Redis and emails
 
-- Add `ci:check` without dropping existing checks. Redis needs its current `check`, protocol
-  fuzzing, and artifact tests. Emails needs its current `verify` behavior.
+- Use `ci:check` for fast checks. Keep protocol fuzzing, repeated builds, and full consumer
+  matrices in manually dispatched extended-test workflows.
 - Fold test type checking into the public `typecheck` command.
 - Add `release:version` as an adapter to `version-packages` initially; preserve old commands
   until documentation and consumers have moved.
-- Add `release:prepare` with the desired release checks and build. To preserve existing
-  behavior, Redis needs `pnpm check && pnpm test:protocol:fuzz`; emails needs `pnpm check`.
+- Use `release:prepare` for fast release checks and the build. Keep archive validation in
+  `release:check`; avoid full provider matrices and live services during publication.
 - Make Redis's shared `release:check` perform its current offline `--skip-live` behavior
   internally. Keep that package-specific flag out of shared YAML.
 - Retain specialized Redis live/provider and emails compiler-compatibility workflows.
