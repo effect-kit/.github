@@ -1,0 +1,16 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    uses: effect-kit/.github/.github/workflows/release.yml@v1
+    # Set bun: true if release verification needs Bun.

@@ -1,0 +1,6 @@
+{
+  "name": "EffectKit release smoke check",
+  "description": "Verify published registry packages against an existing release archive and provenance.",
+  "categories": ["TypeScript"],
+  "filePatterns": ["package.json"]
+}

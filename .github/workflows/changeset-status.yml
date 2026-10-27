@@ -1,0 +1,28 @@
+name: Changeset status
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          # The status action fetches PR refs; it never installs or runs PR scripts.
+          persist-credentials: true
+
+      - id: changesets
+        uses: changesets/action/pr-status@v2
+
+      - name: Show the release impact in the job summary
+        env:
+          CHANGESET_STATUS: ${{ steps.changesets.outputs.comment-body }}
+        run: printf '%s\n' "$CHANGESET_STATUS" >> "$GITHUB_STEP_SUMMARY"

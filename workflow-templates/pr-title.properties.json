@@ -1,0 +1,5 @@
+{
+  "name": "EffectKit PR title",
+  "description": "Check Conventional Commit PR titles for consistent squash commits.",
+  "categories": ["TypeScript"]
+}

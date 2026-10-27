@@ -1,0 +1,6 @@
+{
+  "name": "EffectKit Changeset status",
+  "description": "Show PR release impact in a read-only job summary, including for forks.",
+  "categories": ["TypeScript"],
+  "filePatterns": ["package.json"]
+}

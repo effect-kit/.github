@@ -1,0 +1,192 @@
+name: Package release
+
+on:
+  workflow_call:
+    inputs:
+      bun:
+        description: Install Bun while checking and packing the release
+        type: boolean
+        default: false
+      timeout-minutes:
+        description: Maximum time for release verification
+        type: number
+        default: 30
+      report-paths:
+        description: Additional newline-separated verification report paths
+        type: string
+        default: ""
+    outputs:
+      published:
+        description: Whether packages were published
+        value: ${{ jobs.publish.outputs.published }}
+      published-packages:
+        description: JSON array of published package names and versions
+        value: ${{ jobs.publish.outputs.published-packages }}
+      pack-artifact-id:
+        description: Verified archive artifact ID for a later release smoke check
+        value: ${{ jobs.prepare.outputs.packed }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: effect-kit-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.changesets.outputs.mode }}
+      plan: ${{ steps.changesets.outputs.publish-plan-artifact-id }}
+    steps:
+      - name: Require a manual release from the default branch
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$RELEASE_EVENT" != workflow_dispatch ] || [ "$RELEASE_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo 'Dispatch Release from the repository default branch.' >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          ignore-scripts: "true"
+
+      - id: changesets
+        uses: changesets/action/select-mode@v2
+
+  version:
+    needs: plan
+    if: needs.plan.outputs.mode == 'version'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          ignore-scripts: "true"
+
+      - uses: changesets/action/version@v2
+        with:
+          script: pnpm release:version
+          commit-message: "chore(release): version packages"
+          pr-title: "chore(release): version packages"
+          pr-base-branch: ${{ github.event.repository.default_branch }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+  prepare:
+    needs: plan
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    outputs:
+      packed: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          bun: ${{ inputs.bun }}
+
+      - name: Run package-specific release preparation
+        run: pnpm release:prepare
+
+      - id: pack
+        uses: changesets/action/pack@v2
+        with:
+          publish-plan-artifact-id: ${{ needs.plan.outputs.plan }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+          path: ${{ runner.temp }}/release-candidate
+          merge-multiple: true
+
+      - name: Record archive and release-plan checksums
+        run: |
+          find "$RUNNER_TEMP/release-candidate" -type f -print0 |
+            sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/release-candidate.sha256"
+
+      - name: Verify the exact release candidate
+        run: |
+          pnpm release:check --pack-dir "$RUNNER_TEMP/release-candidate"
+          test -f "$RUNNER_TEMP/release-candidate/verification.json"
+
+      - name: Require verification to leave the candidate unchanged
+        run: sha256sum --check "$RUNNER_TEMP/release-candidate.sha256"
+
+      - name: Record the packed artifact for smoke checks
+        env:
+          PACK_ARTIFACT_ID: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+        run: |
+          printf 'Release run: %s\n\nPacked artifact: %s\n' \
+            "$GITHUB_RUN_ID" "$PACK_ARTIFACT_ID" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verification evidence
+        if: always() && steps.pack.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/release-candidate/verification.json
+            ${{ runner.temp }}/release-candidate.sha256
+            ${{ inputs.report-paths }}
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [plan, prepare]
+    if: needs.plan.outputs.mode == 'publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      published: ${{ steps.publish.outputs.published }}
+      published-packages: ${{ steps.publish.outputs.published-packages }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          ignore-scripts: "true"
+
+      - name: Publish verified archives with OIDC and provenance
+        id: publish
+        uses: changesets/action/publish@v2
+        with:
+          pack-dir-artifact-id: ${{ needs.prepare.outputs.packed }}
+          create-github-releases: true
+          push-git-tags: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
+          PNPM_CONFIG_PROVENANCE: "true"
+          # Registry availability is checked later, after npm finishes processing.
+          PNPM_CONFIG_PUBLISH_WAIT_TIMEOUT: "0"

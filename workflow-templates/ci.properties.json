@@ -1,0 +1,6 @@
+{
+  "name": "EffectKit package CI",
+  "description": "Run the shared pnpm ci:check workflow for an EffectKit workspace.",
+  "categories": ["TypeScript"],
+  "filePatterns": ["package.json"]
+}

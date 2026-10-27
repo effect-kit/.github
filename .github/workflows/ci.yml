@@ -1,0 +1,56 @@
+name: Package CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Override .node-version for a runtime matrix
+        type: string
+        default: ""
+      bun:
+        description: Install Bun from .bun-version
+        type: boolean
+        default: false
+      timeout-minutes:
+        description: Maximum time for the verification job
+        type: number
+        default: 30
+      report-paths:
+        description: Optional newline-separated test report paths to upload
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          node-version: ${{ inputs.node-version }}
+          bun: ${{ inputs.bun }}
+          cache: pnpm
+
+      - run: pnpm ci:check
+
+      - name: Allocate a unique report name for parallel callers
+        id: reports
+        if: always() && inputs.report-paths != ''
+        run: |
+          node --input-type=module -e 'import { randomUUID } from "node:crypto"; console.log("suffix=" + randomUUID());' >> "$GITHUB_OUTPUT"
+
+      - name: Upload test reports
+        if: always() && inputs.report-paths != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-reports-${{ steps.reports.outputs.suffix }}
+          path: ${{ inputs.report-paths }}
+          if-no-files-found: warn
+          retention-days: 14

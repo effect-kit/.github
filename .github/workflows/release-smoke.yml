@@ -1,0 +1,106 @@
+name: Published package smoke check
+
+on:
+  workflow_call:
+    inputs:
+      release-run-id:
+        description: Successful manual release run in the caller repository
+        type: number
+        required: true
+      pack-artifact-id:
+        description: Packed artifact ID recorded by that release run
+        type: number
+        required: true
+      bun:
+        description: Install Bun for package verification
+        type: boolean
+        default: false
+      timeout-minutes:
+        description: Maximum time for registry verification
+        type: number
+        default: 20
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.release.outputs.sha }}
+      run-id: ${{ steps.release.outputs.run-id }}
+      artifact-id: ${{ steps.release.outputs.artifact-id }}
+    steps:
+      - name: Validate the release run and packed artifact
+        id: release
+        uses: actions/github-script@v9
+        env:
+          RELEASE_RUN_ID: ${{ inputs.release-run-id }}
+          PACK_ARTIFACT_ID: ${{ inputs.pack-artifact-id }}
+        with:
+          script: |
+            const runId = Number(process.env.RELEASE_RUN_ID);
+            const artifactId = Number(process.env.PACK_ARTIFACT_ID);
+            if (!Number.isSafeInteger(runId) || runId <= 0 ||
+                !Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error('Release run and artifact IDs must be positive integers.');
+            }
+
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: runId,
+            });
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (run.status !== 'completed' || run.conclusion !== 'success' ||
+                run.event !== 'workflow_dispatch' ||
+                run.head_branch !== context.payload.repository.default_branch ||
+                run.head_repository?.full_name !== repository ||
+                !/^[a-f0-9]{40}$/.test(run.head_sha)) {
+              throw new Error('Choose a successful manual release from this repository default branch.');
+            }
+
+            const { data: workflow } = await github.rest.actions.getWorkflow({
+              ...context.repo, workflow_id: run.workflow_id,
+            });
+            if (workflow.path !== '.github/workflows/release.yml') {
+              throw new Error('The selected run must belong to .github/workflows/release.yml.');
+            }
+
+            const { data: artifact } = await github.rest.actions.getArtifact({
+              ...context.repo, artifact_id: artifactId,
+            });
+            if (artifact.expired || artifact.workflow_run?.id !== runId ||
+                !/^changeset-pack-\d+$/.test(artifact.name)) {
+              throw new Error('Choose an unexpired packed artifact from the selected release run.');
+            }
+
+            core.setOutput('sha', run.head_sha);
+            core.setOutput('run-id', String(runId));
+            core.setOutput('artifact-id', String(artifactId));
+
+  smoke:
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: effect-kit/.github/actions/setup@v1
+        with:
+          bun: ${{ inputs.bun }}
+          ignore-scripts: "true"
+
+      - uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ needs.resolve.outputs.run-id }}
+          artifact-ids: ${{ needs.resolve.outputs.artifact-id }}
+          path: ${{ runner.temp }}/release-candidate
+          merge-multiple: true
+
+      - name: Verify registry availability, contents, and provenance
+        run: pnpm release:smoke --pack-dir "$RUNNER_TEMP/release-candidate" --provenance

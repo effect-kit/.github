@@ -1,0 +1,6 @@
+{
+  "name": "EffectKit package release",
+  "description": "Manually version or publish a verified Changesets release using npm trusted publishing.",
+  "categories": ["TypeScript"],
+  "filePatterns": ["package.json"]
+}
