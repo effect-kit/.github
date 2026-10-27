@@ -18,8 +18,9 @@ Read the [workflow guide](docs/workflows.md) for inputs, caller examples, truste
 and the first `v1` release. The [package script contract](docs/package-scripts.md) defines
 the commands consuming Turborepo repositories must provide.
 
-The templates reference `@v1`. Publish that ref before adopting them in package repositories;
-this checkout does not migrate Redis or emails. Shared workflows require explicit callers.
+The templates reference the published `@v1` workflows. Redis and emails use these callers;
+new package repositories can copy them and implement the standard scripts. PR CI and release
+checks stay fast; extended suites run only through manual dispatch.
 
 This repository needs no dependency installation or build. The shared actions run directly
 in GitHub Actions. Dependabot checks GitHub Actions dependencies weekly.
