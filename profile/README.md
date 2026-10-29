@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/effect-kit/.github/main/profile/assets/header.jpg" alt="effect-kit — Composable tools for Effect." width="100%" />
+<img src="https://raw.githubusercontent.com/effect-kit/.github/main/profile/assets/header.png" alt="effect-kit — Composable tools for Effect." width="100%" />
 
 Open-source packages and integrations for building applications with [Effect](https://effect.website).
 
