@@ -2,19 +2,15 @@
 
 Open-source packages and integrations for building applications with [Effect](https://effect.website).
 
-Each package works on its own, using Effect services, Layers, and typed errors.
-Choose a provider or supply your own implementation.
-
 ## Packages
 
-- **[@effect-kit/redis](https://github.com/effect-kit/redis)** - A Redis client built for Effect, with type-safe commands, scoped connections, and a simple, composable API.
-- **[@effect-kit/emails](https://github.com/effect-kit/emails)** - Typed email sending for Effect with provider Layers, structured errors, and React templates.
+- **[@effect-kit/redis](https://github.com/effect-kit/redis)** - A native Redis client for Effect with typed commands and scoped connections.
+- **[@effect-kit/emails](https://github.com/effect-kit/emails)** - One Email service for 16 providers. Typed messages, React rendering and bounded batches.
 
 ## Contributing
 
 Bug reports, examples, documentation, and new integrations are welcome.
 Start in the package's repository or read the [contribution guide](https://github.com/effect-kit/.github/blob/main/CONTRIBUTING.md).
 
-[Effect docs](https://effect.website/docs) ·
-[npm](https://www.npmjs.com/org/effect-kit) ·
-[envoy1084](https://github.com/envoy1084)
+[Docs](https://effectkit.dev/docs) |
+[npm](https://www.npmjs.com/org/effect-kit)
