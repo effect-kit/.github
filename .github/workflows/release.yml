@@ -136,7 +136,22 @@ jobs:
         with:
           publish-plan-artifact-id: ${{ !inputs.dry-run && needs.plan.outputs.plan || '' }}
 
-      - uses: actions/download-artifact@v8
+      # The run's artifact list can lag behind an upload that just finished, so the first lookup
+      # may not find the pack yet; wait and try once more.
+      - id: download
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          artifact-ids: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+          path: ${{ runner.temp }}/release-candidate
+          merge-multiple: true
+
+      - name: Wait for the packed artifact to be listed
+        if: steps.download.outcome == 'failure'
+        run: sleep 15
+
+      - if: steps.download.outcome == 'failure'
+        uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ steps.pack.outputs.pack-dir-artifact-id }}
           path: ${{ runner.temp }}/release-candidate
